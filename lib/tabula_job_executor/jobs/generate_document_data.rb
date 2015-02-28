@@ -27,8 +27,8 @@ class GenerateDocumentDataJob < Tabula::Background::Job
                   []
                 end
 
-    workspace.insert(0, { 'original_filename' => original_filename, 
-                          'id' => id, 
+    workspace.insert(0, { 'original_filename' => original_filename,
+                          'id' => id,
                           'time' => Time.now.to_i,
                           'page_count' => '?',
                           'size' => File.size(filepath)
@@ -36,15 +36,22 @@ class GenerateDocumentDataJob < Tabula::Background::Job
 
     at(5, 100, "analyzing PDF text...")
 
-    extractor = Tabula::Extraction::PagesInfoExtractor.new(filepath)
+    extractor = Tabula::Extraction::ObjectExtractor.new(filepath)
     File.open(output_dir + "/pages.json", 'w') do |f|
-      page_data = extractor.pages.to_a
+      page_data = extractor.extract.to_a
       workspace[0]['page_count'] = page_data.size
       unless page_data.any?(&:has_text?)
-        at(0, 100, "No text data found") 
+        at(0, 100, "No text data found")
         raise Tabula::NoTextDataException, "no text data found"
       end
-      f.puts page_data.to_json
+      f.puts page_data.map { |p|
+        {
+          :width => p.width,
+          :height => p.height,
+          :number => p.number,
+          :rotation => p.rotation
+        }
+      }.to_json
     end
 
 
@@ -69,6 +76,5 @@ class GenerateDocumentDataJob < Tabula::Background::Job
 
     at(100, 100, "complete")
     return nil
-
   end
 end
